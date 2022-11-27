@@ -4,6 +4,7 @@ from mysql.connector import Error
 try:
     connection = mysql.connector.connect(host='localhost',
                                          database='local',
+                                         port='10005',
                                          user='root',
                                          password='root')
     if connection.is_connected():
