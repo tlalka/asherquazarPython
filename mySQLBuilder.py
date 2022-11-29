@@ -2,14 +2,23 @@ import mysql.connector
 from mysql.connector import errorcode
 import glob
 import json
-import random
+import os
+import requests
+import base64
 
 #This script builds MySQL tables that do not exist
 #Checks the JSON folder for artists that don't exist in the artist table
 #Then adds them into the table schema
 #It updates existing entries
 
-src= "json/*"
+src = "json/*"
+imgsrc = "images/"
+imagetypes = ["Portrait", "Landscape", "Still Life", "Full Body", "City"]
+imagenum = 4
+HOST = "http://asherquazar.local"
+MEDIA = HOST + "/wp-json/wp/v2/media"
+PASS = "Ta3x qPGC mgkr mt4X H7f1 si3i"
+USER = "tlalka"
 
 #-------------SCHEMA
 DB_NAME = 'artist_data'
@@ -165,13 +174,51 @@ def add_one_JSON(cursor, data, connection):
         #print(emp_no)
         #connection.commit()
     
+    #Add image to wordpress. Image names are standardized
+    #If image exists in folder upload it to wordpress replacing the old one
+    #If it doesnt, pull the wordpress ID for the existing one
+    tmppath = imgsrc + data['fullname'].replace(" ", "_")
+    dirList = os.listdir(tmppath)
+    #print(dirList)
+    for dir in imagetypes:
+        tmppath2 = tmppath + "/" + dir.replace(" ", "_")
+        #print(tmppath2)
+        for i in range(1, imagenum + 1):
+            tmpfile = tmppath2 + "/" + dir.replace(" ", "-") + "-in-the-style-of-" + data['fullname'].replace(" ", "-") + "-" + str(i) + ".png"
+            print(tmpfile)
+
+    print("start api")
+    example = "images/John_Berkey/City/City-in-the-style-of-John-Berkey-1.png"
+    image = open(example, "rb").read()
+    filename = os.path.basename(example)
+    creadentials = USER + ':' + PASS
+    token = base64.b64encode(creadentials.encode())
+    header = {
+        'Authorization': 'Basic ' + token.decode('utf-8'),
+        "Content-Type": 'image/png',
+        'Content-Disposition': 'attachment; filename=' + filename,
+    }
+
+    resp = requests.post(
+        MEDIA,
+        headers = header,
+        data = image,
+    )
+    
+    print(resp)
+    #newDict = wprequest.json()
+    #newID = newDict.get('id')
+    #print (newID)
+    #link = newDict.get('guid').get("rendered")
+    #print (newID + " " + link)
+
     #image_index
     add_image=(
         "INSERT INTO image_index"
         "(image_id, artist, type)"
         "VALUES (%i, %i, %s)"
     )
-    data_artist = (XXX, data['fullname'], data['deathyear'])
+    #data_artist = (XXX, data['fullname'], data['deathyear'])
     
     #image_type_details
     #decades
