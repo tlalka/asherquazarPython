@@ -186,31 +186,67 @@ def add_one_JSON(cursor, data, connection):
         for i in range(1, imagenum + 1):
             tmpfile = tmppath2 + "/" + dir.replace(" ", "-") + "-in-the-style-of-" + data['fullname'].replace(" ", "-") + "-" + str(i) + ".png"
             print(tmpfile)
+            filename = os.path.basename(tmpfile)
+            #!!!!!!!!!! if image does not exist, break
+            image = open(tmpfile, "rb").read()
+            credentials = USER + ':' + PASS
+            token = base64.b64encode(credentials.encode())
 
-    print("start api")
-    example = "images/John_Berkey/City/City-in-the-style-of-John-Berkey-1.png"
-    image = open(example, "rb").read()
-    filename = os.path.basename(example)
-    creadentials = USER + ':' + PASS
-    token = base64.b64encode(creadentials.encode())
-    header = {
-        'Authorization': 'Basic ' + token.decode('utf-8'),
-        "Content-Type": 'image/png',
-        'Content-Disposition': 'attachment; filename=' + filename,
-    }
+            #test if image is in WP
+            param = {
+                'search': filename
+                }
+            
+            resp = requests.get(
+                MEDIA,
+                params = param
+            )
 
-    resp = requests.post(
-        MEDIA,
-        headers = header,
-        data = image,
-    )
-    
-    print(resp)
-    #newDict = wprequest.json()
-    #newID = newDict.get('id')
-    #print (newID)
-    #link = newDict.get('guid').get("rendered")
-    #print (newID + " " + link)
+            print(resp)
+            newDict = resp.json()
+            print(newDict)
+
+            if len(newDict) > 0:
+                imageID = newDict[0]['id']
+                print(filename + " exists at ID " + str(imageID))
+                #update image
+                header = {
+                    'Authorization': 'Basic ' + token.decode('utf-8')
+                }
+
+                resp = requests.post(
+                    MEDIA + str(imageID),
+                    headers = header,
+                    data = image,
+                )
+                
+                print(resp)
+                newDict = resp.json()
+                print (newDict)
+                newID = newDict.get('id')
+                link = newDict.get('guid').get("rendered")
+                print ("Updated at " + link)
+
+            else:
+                print(filename + " does not exist")
+                #add image
+                header = {
+                    'Authorization': 'Basic ' + token.decode('utf-8'),
+                    "Content-Type": 'image/png',
+                    'Content-Disposition': 'attachment; filename=' + filename,
+                }
+
+                resp = requests.post(
+                    MEDIA,
+                    headers = header,
+                    data = image,
+                )
+                
+                print(resp)
+                newDict = resp.json()
+                newID = newDict.get('id')
+                link = newDict.get('guid').get("rendered")
+                print ("Added at " + link)
 
     #image_index
     add_image=(
