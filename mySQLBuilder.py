@@ -39,7 +39,7 @@ TABLES['artist_index'] = (
 
 TABLES['image_index'] = (
     "CREATE TABLE image_index ("
-    "  image_id INT NOT NULL,"
+    "  image_id int NOT NULL,"
     "  artist_id int NOT NULL,"
     "  type varchar (25) NOT NULL,"  
     "  PRIMARY KEY (image_id)"
@@ -154,13 +154,16 @@ def add_one_JSON(cursor, data, connection):
     check_dupe=("SELECT artist_id from artist_index WHERE name=%s")
     dupe_data=(data['fullname'],)
     cursor.execute(check_dupe, dupe_data)
+    resp = cursor.fetchone()
+    artistID = -1
 
-    if(len(cursor.fetchone())>0):
+    if(resp is not None):
         print(dupe_data[0] + " exists. Updating.")
         add_artist=("UPDATE artist_index SET birth=%s, death=%s, style=%s, bio=%s, wiki=%s, nationality=%s"
             "WHERE name=%s")
         data_artist = (data['birthyear'], data['deathyear'], data['style'], data['biography'], data['wikilink'], data['nationality'], data['fullname'])
         cursor.execute(add_artist, data_artist)
+        artistID = resp[0]
         print(cursor.rowcount, "record(s) affected") 
 
     else:
@@ -170,8 +173,7 @@ def add_one_JSON(cursor, data, connection):
             "VALUES (%s, %s, %s, %s, %s, %s, %s)")
         data_artist = (data['fullname'], data['birthyear'], data['deathyear'], data['style'], data['biography'], data['wikilink'], data['nationality'])
         #cursor.execute(add_artist, data_artist)
-        #emp_no = cursor.lastrowid
-        #print(emp_no)
+        artistID = cursor.lastrowid
         #connection.commit()
     
     #Add image to wordpress. Image names are standardized
@@ -179,74 +181,103 @@ def add_one_JSON(cursor, data, connection):
     #If it doesnt, pull the wordpress ID for the existing one
     tmppath = imgsrc + data['fullname'].replace(" ", "_")
     dirList = os.listdir(tmppath)
-    #print(dirList)
+    
+    #Run through image types
     for dir in imagetypes:
         tmppath2 = tmppath + "/" + dir.replace(" ", "_")
-        #print(tmppath2)
+        #Run though number of images
         for i in range(1, imagenum + 1):
             tmpfile = tmppath2 + "/" + dir.replace(" ", "-") + "-in-the-style-of-" + data['fullname'].replace(" ", "-") + "-" + str(i) + ".png"
-            print(tmpfile)
             filename = os.path.basename(tmpfile)
-            #!!!!!!!!!! if image does not exist, break
-            image = open(tmpfile, "rb").read()
-            credentials = USER + ':' + PASS
-            token = base64.b64encode(credentials.encode())
 
-            #test if image is in WP
-            param = {
-                'search': filename
-                }
-            
-            resp = requests.get(
-                MEDIA,
-                params = param
-            )
+            #if image exists locally, upload/update it on WP
+            if os.path.exists(tmpfile):
+                image = open(tmpfile, "rb").read()
+                credentials = USER + ':' + PASS
+                token = base64.b64encode(credentials.encode())
 
-            print(resp)
-            newDict = resp.json()
-            print(newDict)
-
-            if len(newDict) > 0:
-                imageID = newDict[0]['id']
-                print(filename + " exists at ID " + str(imageID))
-                #update image
-                header = {
-                    'Authorization': 'Basic ' + token.decode('utf-8')
-                }
-
-                resp = requests.post(
-                    MEDIA + str(imageID),
-                    headers = header,
-                    data = image,
-                )
+                #test if image exists on WP by checking the name
+                param = {
+                    'search': filename
+                    }
                 
-                print(resp)
+                resp = requests.get(
+                    MEDIA,
+                    params = param
+                )
+
+                #print(resp)
                 newDict = resp.json()
-                print (newDict)
-                newID = newDict.get('id')
-                link = newDict.get('guid').get("rendered")
-                print ("Updated at " + link)
+                #print(newDict)
+
+                if len(newDict) > 0:
+                    imageID = newDict[0]['id']
+                    print(filename + " exists at ID " + str(imageID))
+                    #Image exists on WP, so update it
+                    header = {
+                        'Authorization': 'Basic ' + token.decode('utf-8')
+                    }
+
+                    resp = requests.post(
+                        MEDIA + "/" + str(imageID),
+                        headers = header,
+                        data = image,
+                    )
+                    
+                    #print(resp)
+                    newDict = resp.json()
+                    #print (newDict)
+                    link = newDict.get('guid').get("rendered")
+                    print ("UPDATED at " + link)
+
+                else:
+                    #image does not exist on WP, so upload it
+                    print(filename + " does not exist")
+                    header = {
+                        'Authorization': 'Basic ' + token.decode('utf-8'),
+                        "Content-Type": 'image/png',
+                        'Content-Disposition': 'attachment; filename=' + filename,
+                    }
+
+                    resp = requests.post(
+                        MEDIA,
+                        headers = header,
+                        data = image,
+                    )
+                    
+                    newDict = resp.json()
+                    imageID = newDict.get('id')
+                    link = newDict.get('guid').get("rendered")
+                    print ("ADDED new image at at " + link)
+
+            #Image uploaded/updated - add it to image index
+            #Check for duplicate
+            check_dupe=("SELECT artist_id from image_index WHERE image_id=%s")
+            dupe_data=(imageID,)
+            cursor.execute(check_dupe, dupe_data)    
+            resp = cursor.fetchone()
+            print(resp)
+
+            if(resp is not None):
+                print(str(imageID) + " exists. Updating.")
+                add_image=("UPDATE image_index SET artist_id=%s, type=%s WHERE image_id=%s")
+                data_image = (artistID, dir, imageID)
+                cursor.execute(add_image, data_image)
+                print(cursor.rowcount, "record(s) affected") 
 
             else:
-                print(filename + " does not exist")
-                #add image
-                header = {
-                    'Authorization': 'Basic ' + token.decode('utf-8'),
-                    "Content-Type": 'image/png',
-                    'Content-Disposition': 'attachment; filename=' + filename,
-                }
+                print(str(imageID) + " does not exist. Adding.")
+                add_image=("INSERT INTO image_index"
+                    "(image_id, artist_id, type)"
+                    "VALUES (%s, %s, %s)")
+                data_image = (imageID, artistID, dir)
+                cursor.execute(add_image, data_image)
+                emp_no = cursor.lastrowid
+                print(emp_no)
+                #connection.commit()
+            break
+        break
 
-                resp = requests.post(
-                    MEDIA,
-                    headers = header,
-                    data = image,
-                )
-                
-                print(resp)
-                newDict = resp.json()
-                newID = newDict.get('id')
-                link = newDict.get('guid').get("rendered")
-                print ("Added at " + link)
 
     #image_index
     add_image=(
@@ -261,6 +292,7 @@ def add_one_JSON(cursor, data, connection):
     #movements
     #tags
     #pitfalls
+    connection.commit()
 
 if __name__ == '__main__':
     main()
