@@ -402,27 +402,53 @@ def add_one_JSON(cursor, data, connection):
 
 def mySQL_add_or_update(filename, table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor):
     #Take in table_name, artistID, dupe_ID, dupe_val, column_IDs[], column_vals[], cursor
-    check_dupe=("SELECT artist_id from %s WHERE %s=%s")
-    dupe_data=(table_name, dupe_ID, dupe_val)
-    cursor.execute(check_dupe, dupe_data)    
-    resp = cursor.fetchone()
+    #Everything must come in as a string except artist ID
+    if (len(column_IDs) != len(column_vals)):
+        raise ValueError("column ID and vals must have the same size")
+    
+    #check_dupe=("SELECT artist_id from %s WHERE %s=%s")
+    #dupe_data=(table_name, dupe_ID, dupe_val)
+    #cursor.execute(check_dupe, dupe_data)    
+    #resp = cursor.fetchone()
+    resp = [1]
 
     if(resp is not None and resp[0] == artistID):
-        print(filename + " exists in " + table_name + ". Updating.")
-        add_image=("UPDATE %s SET artist_id=%s, type=%s WHERE %s=%s") #figure out how to make this variable
-        data_image = (artistID, dir, imageID)
-        cursor.execute(add_image, data_image)
-        print(cursor.rowcount, "record(s) affected") 
+        if(len(column_IDs) > 1):
+            print(filename + " exists in " + table_name + ". Updating.")
+            add = "UPDATE " + table_name + " SET "
+            for ID, val in zip(column_IDs, column_vals):
+                add = add + ID + "=" + val +", "
+            add = add[:-2] + " WHERE " + dupe_ID + "=" + dupe_val
+            print(add)
+            #add_image=("UPDATE %s SET artist_id=%s, type=%s WHERE %s=%s") #figure out how to make this variable
+            #data_image = (artistID, dir, imageID)
+            #cursor.execute(add)
+            #print(cursor.rowcount, "record(s) affected") 
+        else:
+            print(filename + " exists in " + table_name + ". Doing nothing.")
 
     else:
         print(filename + " does not exist in image_index. Adding.")
-        add_image=("INSERT INTO image_index"
-            "(image_id, artist_id, type)"
-            "VALUES (%s, %s, %s)")
-        data_image = (imageID, artistID, dir)
-        cursor.execute(add_image, data_image)
-        emp_no = cursor.lastrowid
-        print(emp_no)
+
+        add = "INSERT INTO " + table_name + " "
+        for ID, val in zip(column_IDs, column_vals):
+            add = add + ID + "=" + val + ", "
+        add = add + dupe_ID + "=" + dupe_val
+        print(add)
+
+        #cursor.execute(add_image, data_image)
+        #emp_no = cursor.lastrowid
+        #print(emp_no)
+    
 
 if __name__ == '__main__':
-    main()
+    #main()
+    filename = "test"
+    table_name = "artist_index"
+    artistID = 1
+    dupe_ID = "name"
+    dupe_val = "steve"
+    column_IDs = ["birth", "death"]
+    column_vals = ["1980", "2000"]
+    cursor = "no"
+    mySQL_add_or_update(filename, table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
