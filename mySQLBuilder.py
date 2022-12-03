@@ -379,8 +379,6 @@ def add_one_JSON(cursor, data, connection):
                 emp_no = cursor.lastrowid
                 print(emp_no)
                            
-            break
-        break
     connection.commit()
 
 if __name__ == '__main__':
