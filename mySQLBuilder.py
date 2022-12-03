@@ -24,6 +24,7 @@ USER = "tlalka"
 DB_NAME = 'artist_data'
 TABLES = {}
 
+#Keep bio info on an artist
 TABLES['artist_index'] = (
     "CREATE TABLE artist_index ("
     "  artist_id int NOT NULL AUTO_INCREMENT,"
@@ -37,6 +38,7 @@ TABLES['artist_index'] = (
     "  PRIMARY KEY (artist_id)"
     ") ENGINE=InnoDB")
 
+#map images WP ids to artists and their type
 TABLES['image_index'] = (
     "CREATE TABLE image_index ("
     "  image_id int NOT NULL,"
@@ -45,31 +47,36 @@ TABLES['image_index'] = (
     "  PRIMARY KEY (image_id)"
     ") ENGINE=InnoDB")
 
+#record description of each image type per artist
 TABLES['image_type_details'] = (
     "CREATE TABLE image_type_details ("
     "  artist_id int NOT NULL,"
     "  type varchar (25) NOT NULL,"
-    "  description tinytext"
+    "  description text"
     ") ENGINE=InnoDB")
 
+#record decades an artist was active
 TABLES['decades'] = (
     "CREATE TABLE decades ("
     "  artist_id int NOT NULL,"
-    "  year tinyint NOT NULL"
+    "  year smallint NOT NULL"
     ") ENGINE=InnoDB")
 
+#record movements an artist participated in
 TABLES['movements'] = (
     "CREATE TABLE movements ("
     "  artist_id int NOT NULL,"
     "  movement varchar (25) NOT NULL"
     ") ENGINE=InnoDB")
 
+#record tags associated with an artist
 TABLES['tags'] = (
     "CREATE TABLE `tags` ("
     "  artist_id int NOT NULL,"
     "  tag varchar (25) NOT NULL"
     ") ENGINE=InnoDB")
 
+#record pitfalls associated with an artist
 TABLES['pitfalls'] = (
     "CREATE TABLE pitfalls ("
     "  artist_id int NOT NULL,"
@@ -147,6 +154,7 @@ def loop_JSON(cursor, connection):
             add_one_JSON(cursor, data, connection)
         
        
+#!!!!!!!!!!!!probably need to reset cursor here            
 def add_one_JSON(cursor, data, connection):
     #add one JSON to the database
     #artist_index
@@ -158,7 +166,7 @@ def add_one_JSON(cursor, data, connection):
     artistID = -1
 
     if(resp is not None):
-        print(dupe_data[0] + " exists. Updating.")
+        print(dupe_data[0] + " exists in artist_index. Updating.")
         add_artist=("UPDATE artist_index SET birth=%s, death=%s, style=%s, bio=%s, wiki=%s, nationality=%s"
             "WHERE name=%s")
         data_artist = (data['birthyear'], data['deathyear'], data['style'], data['biography'], data['wikilink'], data['nationality'], data['fullname'])
@@ -167,14 +175,87 @@ def add_one_JSON(cursor, data, connection):
         print(cursor.rowcount, "record(s) affected") 
 
     else:
-        print(dupe_data + " does not exist. adding.")
+        print(dupe_data + " does not exist in artist_index. adding.")
         add_artist=("INSERT INTO artist_index"
             "(name, birth, death, style, bio, wiki, nationality)"
             "VALUES (%s, %s, %s, %s, %s, %s, %s)")
         data_artist = (data['fullname'], data['birthyear'], data['deathyear'], data['style'], data['biography'], data['wikilink'], data['nationality'])
         #cursor.execute(add_artist, data_artist)
         artistID = cursor.lastrowid
-        #connection.commit()
+
+    print("artist ID " + str(artistID))
+    #decades
+    for decade in data['decades']:
+        check_dupe=("SELECT artist_id from decades WHERE year=%s")
+        dupe_data=(decade,)
+        cursor.execute(check_dupe, dupe_data)
+        resp = cursor.fetchone()
+        print(resp)
+
+        if(resp is not None and resp[0] == artistID):
+            print(str(decade) + " exists in decades. Do nothing.")
+
+        else:
+            print(str(decade) + " does not exist in decades. Adding.")
+            add_artist=("INSERT INTO decades"
+                "(artist_id, year)"
+                "VALUES (%s, %s)")
+            data_artist = (artistID, decade)
+            cursor.execute(add_artist, data_artist)
+
+    #movements  
+    for movement in data['movements']:
+        check_dupe=("SELECT artist_id from movements WHERE movement=%s")
+        dupe_data=(movement,)
+        cursor.execute(check_dupe, dupe_data)
+        resp = cursor.fetchone()
+
+        if(resp is not None and resp[0] == artistID):
+            print(movement + " exists in movements. Do nothing.")
+
+        else:
+            print(movement + " does not exist in movements. Adding.")
+            add_artist=("INSERT INTO movements"
+                "(artist_id, movement)"
+                "VALUES (%s, %s)")
+            data_artist = (artistID, movement)
+            cursor.execute(add_artist, data_artist)   
+
+    #tags      
+    for tag in data['tags']:
+        check_dupe=("SELECT artist_id from tags WHERE tag=%s")
+        dupe_data=(tag,)
+        cursor.execute(check_dupe, dupe_data)
+        resp = cursor.fetchone()
+
+        if(resp is not None and resp[0] == artistID):
+            print(tag + " exists in tags. Do nothing.")
+
+        else:
+            print(tag + " does not exist in tags. Adding.")
+            add_artist=("INSERT INTO tags"
+                "(artist_id, tag)"
+                "VALUES (%s, %s)")
+            data_artist = (artistID, tag)
+            cursor.execute(add_artist, data_artist)  
+
+    #pitfalls
+    for pitfall in data['pitfalls']:
+        check_dupe=("SELECT artist_id from pitfalls WHERE pitfall=%s")
+        dupe_data=(pitfall,)
+        cursor.execute(check_dupe, dupe_data)
+        resp = cursor.fetchone()
+
+        if(resp is not None and resp[0] == artistID):
+            print(pitfall + " exists in pitfalls. Do nothing.")
+
+        else:
+            print(pitfall + " does not exist in pitfalls. Adding.")
+            add_artist=("INSERT INTO pitfalls"
+                "(artist_id, pitfall)"
+                "VALUES (%s, %s)")
+            data_artist = (artistID, pitfall)
+            cursor.execute(add_artist, data_artist)  
     
     #Add image to wordpress. Image names are standardized
     #If image exists in folder upload it to wordpress replacing the old one
@@ -185,6 +266,30 @@ def add_one_JSON(cursor, data, connection):
     #Run through image types
     for dir in imagetypes:
         tmppath2 = tmppath + "/" + dir.replace(" ", "_")
+
+        #Update image_type_details 
+        check_dupe=("SELECT artist_id from image_type_details WHERE type=%s")
+        dupe_data=(dir,)
+        cursor.execute(check_dupe, dupe_data)    
+        resp = cursor.fetchone()
+
+        if(resp is not None and resp[0] == artistID):
+            print(dir + " exists in image_type_details. Updating.")
+            add_image=("UPDATE image_type_details SET artist_id=%s, description=%s WHERE type=%s")
+            data_image = (artistID, data[dir.replace(" ", "_").lower()], dir)
+            cursor.execute(add_image, data_image)
+            print(cursor.rowcount, "record(s) affected") 
+
+        else:
+            print(dir + " does not exist in image_type_details. Adding.")
+            add_image=("INSERT INTO image_type_details"
+                "(artist_id, description, type)"
+                "VALUES (%s, %s, %s)")
+            data_image = (artistID, data[dir.replace(" ", "_").lower()], dir)
+            cursor.execute(add_image, data_image)
+            emp_no = cursor.lastrowid
+            print(emp_no)
+
         #Run though number of images
         for i in range(1, imagenum + 1):
             tmpfile = tmppath2 + "/" + dir.replace(" ", "-") + "-in-the-style-of-" + data['fullname'].replace(" ", "-") + "-" + str(i) + ".png"
@@ -256,17 +361,16 @@ def add_one_JSON(cursor, data, connection):
             dupe_data=(imageID,)
             cursor.execute(check_dupe, dupe_data)    
             resp = cursor.fetchone()
-            print(resp)
 
-            if(resp is not None):
-                print(str(imageID) + " exists. Updating.")
+            if(resp is not None and resp[0] == artistID):
+                print(filename + " exists in image_index. Updating.")
                 add_image=("UPDATE image_index SET artist_id=%s, type=%s WHERE image_id=%s")
                 data_image = (artistID, dir, imageID)
                 cursor.execute(add_image, data_image)
                 print(cursor.rowcount, "record(s) affected") 
 
             else:
-                print(str(imageID) + " does not exist. Adding.")
+                print(filename + " does not exist in image_index. Adding.")
                 add_image=("INSERT INTO image_index"
                     "(image_id, artist_id, type)"
                     "VALUES (%s, %s, %s)")
@@ -274,24 +378,9 @@ def add_one_JSON(cursor, data, connection):
                 cursor.execute(add_image, data_image)
                 emp_no = cursor.lastrowid
                 print(emp_no)
-                #connection.commit()
+                           
             break
         break
-
-
-    #image_index
-    add_image=(
-        "INSERT INTO image_index"
-        "(image_id, artist, type)"
-        "VALUES (%i, %i, %s)"
-    )
-    #data_artist = (XXX, data['fullname'], data['deathyear'])
-    
-    #image_type_details
-    #decades
-    #movements
-    #tags
-    #pitfalls
     connection.commit()
 
 if __name__ == '__main__':
