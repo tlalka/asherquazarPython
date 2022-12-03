@@ -1,0 +1,19 @@
+{
+	"fullname" : "Claude Monet",
+	"wpID" : -1,
+	"birthyear" : 1840,
+	"deathyear" : 1926,
+	"biography" : "Oscar-Claude Monet (1840-1926) was a French painter and founder of impressionist painting.",
+	"wikilink" : "https://en.wikipedia.org/wiki/Claude_Monet",
+	"style" : "Impressionism",
+	"movements" : ["Impressionism"],
+	"decades": [1860, 1870, 1880, 1890, 1900, 1910, 1920],
+	"nationality": "French",
+	"tags": ["water lilies", "water", "flowers", "lake", "pond", "trees", "garden", "nature", "landscape"],
+	"pitfalls": ["muddy", "Frames", "signatures", "blurry", "low-contrast"],
+	"landscape": "Based on the foggy colors, soft blending, and lack of contrast, I believe these images are influenced by works from later in Monet's career when he was losing his vision.",
+	"portrait": "Monet was not known for portraits. Three of these images seem to be Monet himself, while the second lacks any figure.",
+	"full_body": "These images evoke mechanized suits, space suits, and football players.",
+	"still_life": "We see both traditional full body images of women, and more scenic images with a man placed in the scene.",
+	"city": "These cities are heavily influenced by the cities he painted in life, like London and Venice (I think I see Big Ben in the first two). Water appears in all four images."
+}

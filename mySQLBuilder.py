@@ -47,6 +47,22 @@ TABLES['image_index'] = (
     "  PRIMARY KEY (image_id)"
     ") ENGINE=InnoDB")
 
+#map images WP ids to artists and their type
+TABLES['works_index'] = (
+    "CREATE TABLE works_index ("
+    "  image_id int NOT NULL,"
+    "  artist_id int NOT NULL," 
+    "  PRIMARY KEY (image_id)"
+    ") ENGINE=InnoDB")
+
+#map images WP ids to artists and their type
+TABLES['profile_index'] = (
+    "CREATE TABLE profile_index ("
+    "  image_id int NOT NULL,"
+    "  artist_id int NOT NULL," 
+    "  PRIMARY KEY (image_id)"
+    ") ENGINE=InnoDB")
+
 #record description of each image type per artist
 TABLES['image_type_details'] = (
     "CREATE TABLE image_type_details ("
@@ -83,9 +99,8 @@ TABLES['pitfalls'] = (
     "  pitfall varchar (25) NOT NULL"
     ") ENGINE=InnoDB")
 
-
+#-----------------MAIN
 def main():
-    #-----------------Try connection
     try:
         connection = mysql.connector.connect(host='localhost',
                                             port='10005',
@@ -112,7 +127,7 @@ def main():
             print("You're connected to database: ", record)
             
             #If tables don't exist, create them
-            #create_tables(cursor)
+            create_tables(cursor)
 
             #Load up JSONs
             loop_JSON(cursor, connection)
@@ -120,14 +135,14 @@ def main():
     except errorcode as e:
         print("Error while connecting to MySQL", e)
 
-    #---------------disconnect    
+#---------------DISCONNECT    
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
             print("MySQL connection is closed")
 
-#-----------------------functions
+#-----------------------FUNCTIONS
 def create_tables(cursor):
     #create tables if they don't exist
     for table_name in TABLES:
@@ -152,13 +167,17 @@ def loop_JSON(cursor, connection):
             data = json.load(f)
             print("Adding: " + data['fullname'])
             add_one_JSON(cursor, data, connection)
+
+            #add works if they exist
+
+            #add profile if it exists
         
        
 #!!!!!!!!!!!!probably need to reset cursor here            
 def add_one_JSON(cursor, data, connection):
     #add one JSON to the database
-    #artist_index
-    #check if artist name exists
+
+    #artist_index. Check if artist name exists
     check_dupe=("SELECT artist_id from artist_index WHERE name=%s")
     dupe_data=(data['fullname'],)
     cursor.execute(check_dupe, dupe_data)
@@ -380,6 +399,30 @@ def add_one_JSON(cursor, data, connection):
                 print(emp_no)
                            
     connection.commit()
+
+def mySQL_add_or_update(filename, table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor):
+    #Take in table_name, artistID, dupe_ID, dupe_val, column_IDs[], column_vals[], cursor
+    check_dupe=("SELECT artist_id from %s WHERE %s=%s")
+    dupe_data=(table_name, dupe_ID, dupe_val)
+    cursor.execute(check_dupe, dupe_data)    
+    resp = cursor.fetchone()
+
+    if(resp is not None and resp[0] == artistID):
+        print(filename + " exists in " + table_name + ". Updating.")
+        add_image=("UPDATE %s SET artist_id=%s, type=%s WHERE %s=%s") #figure out how to make this variable
+        data_image = (artistID, dir, imageID)
+        cursor.execute(add_image, data_image)
+        print(cursor.rowcount, "record(s) affected") 
+
+    else:
+        print(filename + " does not exist in image_index. Adding.")
+        add_image=("INSERT INTO image_index"
+            "(image_id, artist_id, type)"
+            "VALUES (%s, %s, %s)")
+        data_image = (imageID, artistID, dir)
+        cursor.execute(add_image, data_image)
+        emp_no = cursor.lastrowid
+        print(emp_no)
 
 if __name__ == '__main__':
     main()
