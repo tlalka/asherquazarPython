@@ -165,12 +165,14 @@ def loop_JSON(cursor, connection):
     for single_file in files:
         with open(single_file, 'r') as f:
             data = json.load(f)
-            print("Adding: " + data['fullname'])
+            print("JSON handle: " + data['fullname'])
             add_one_JSON(cursor, data, connection)
 
             #add works if they exist
 
             #add profile if it exists
+        connection.commit()
+
         
        
 #!!!!!!!!!!!!probably need to reset cursor here            
@@ -178,104 +180,51 @@ def add_one_JSON(cursor, data, connection):
     #add one JSON to the database
 
     #artist_index. Check if artist name exists
-    check_dupe=("SELECT artist_id from artist_index WHERE name=%s")
-    dupe_data=(data['fullname'],)
-    cursor.execute(check_dupe, dupe_data)
-    resp = cursor.fetchone()
+    filename = data['fullname']
+    table_name = "artist_index"
     artistID = -1
+    dupe_ID = "name"
+    dupe_val = data['fullname']
+    column_IDs = ["birth", "death", "style", "bio", "wiki", "nationality"]
+    column_vals = [str(data['birthyear']), str(data['deathyear']), data['style'], data['biography'], data['wikilink'], data['nationality']]
+    artistID = mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
 
-    if(resp is not None):
-        print(dupe_data[0] + " exists in artist_index. Updating.")
-        add_artist=("UPDATE artist_index SET birth=%s, death=%s, style=%s, bio=%s, wiki=%s, nationality=%s"
-            "WHERE name=%s")
-        data_artist = (data['birthyear'], data['deathyear'], data['style'], data['biography'], data['wikilink'], data['nationality'], data['fullname'])
-        cursor.execute(add_artist, data_artist)
-        artistID = resp[0]
-        print(cursor.rowcount, "record(s) affected") 
-
-    else:
-        print(dupe_data + " does not exist in artist_index. adding.")
-        add_artist=("INSERT INTO artist_index"
-            "(name, birth, death, style, bio, wiki, nationality)"
-            "VALUES (%s, %s, %s, %s, %s, %s, %s)")
-        data_artist = (data['fullname'], data['birthyear'], data['deathyear'], data['style'], data['biography'], data['wikilink'], data['nationality'])
-        #cursor.execute(add_artist, data_artist)
-        artistID = cursor.lastrowid
-
-    print("artist ID " + str(artistID))
     #decades
     for decade in data['decades']:
-        check_dupe=("SELECT artist_id from decades WHERE year=%s")
-        dupe_data=(decade,)
-        cursor.execute(check_dupe, dupe_data)
-        resp = cursor.fetchone()
-        print(resp)
-
-        if(resp is not None and resp[0] == artistID):
-            print(str(decade) + " exists in decades. Do nothing.")
-
-        else:
-            print(str(decade) + " does not exist in decades. Adding.")
-            add_artist=("INSERT INTO decades"
-                "(artist_id, year)"
-                "VALUES (%s, %s)")
-            data_artist = (artistID, decade)
-            cursor.execute(add_artist, data_artist)
+        table_name = "decades"
+        dupe_ID = "year"
+        dupe_val = decade
+        column_IDs = ['artist_id']
+        column_vals = [artistID]
+        mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
 
     #movements  
     for movement in data['movements']:
-        check_dupe=("SELECT artist_id from movements WHERE movement=%s")
-        dupe_data=(movement,)
-        cursor.execute(check_dupe, dupe_data)
-        resp = cursor.fetchone()
-
-        if(resp is not None and resp[0] == artistID):
-            print(movement + " exists in movements. Do nothing.")
-
-        else:
-            print(movement + " does not exist in movements. Adding.")
-            add_artist=("INSERT INTO movements"
-                "(artist_id, movement)"
-                "VALUES (%s, %s)")
-            data_artist = (artistID, movement)
-            cursor.execute(add_artist, data_artist)   
+        table_name = "movements"
+        dupe_ID = "movement"
+        dupe_val = movement
+        column_IDs = ['artist_id']
+        column_vals = [artistID]
+        mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
 
     #tags      
     for tag in data['tags']:
-        check_dupe=("SELECT artist_id from tags WHERE tag=%s")
-        dupe_data=(tag,)
-        cursor.execute(check_dupe, dupe_data)
-        resp = cursor.fetchone()
-
-        if(resp is not None and resp[0] == artistID):
-            print(tag + " exists in tags. Do nothing.")
-
-        else:
-            print(tag + " does not exist in tags. Adding.")
-            add_artist=("INSERT INTO tags"
-                "(artist_id, tag)"
-                "VALUES (%s, %s)")
-            data_artist = (artistID, tag)
-            cursor.execute(add_artist, data_artist)  
+        table_name = "tags"
+        dupe_ID = "tag"
+        dupe_val = tag
+        column_IDs = ['artist_id']
+        column_vals = [artistID]
+        mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
 
     #pitfalls
     for pitfall in data['pitfalls']:
-        check_dupe=("SELECT artist_id from pitfalls WHERE pitfall=%s")
-        dupe_data=(pitfall,)
-        cursor.execute(check_dupe, dupe_data)
-        resp = cursor.fetchone()
+        table_name = "pitfalls"
+        dupe_ID = "pitfall"
+        dupe_val = pitfall
+        column_IDs = ['artist_id']
+        column_vals = [artistID]
+        mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
 
-        if(resp is not None and resp[0] == artistID):
-            print(pitfall + " exists in pitfalls. Do nothing.")
-
-        else:
-            print(pitfall + " does not exist in pitfalls. Adding.")
-            add_artist=("INSERT INTO pitfalls"
-                "(artist_id, pitfall)"
-                "VALUES (%s, %s)")
-            data_artist = (artistID, pitfall)
-            cursor.execute(add_artist, data_artist)  
-    
     #Add image to wordpress. Image names are standardized
     #If image exists in folder upload it to wordpress replacing the old one
     #If it doesnt, pull the wordpress ID for the existing one
@@ -285,17 +234,16 @@ def add_one_JSON(cursor, data, connection):
     #Run through image types
     for dir in imagetypes:
         tmppath2 = tmppath + "/" + dir.replace(" ", "_")
-
-        #Update image_type_details 
+        #Update image_type_details. Method does not work for this because we have 2 wheres
         check_dupe=("SELECT artist_id from image_type_details WHERE type=%s")
         dupe_data=(dir,)
         cursor.execute(check_dupe, dupe_data)    
-        resp = cursor.fetchone()
+        resp = cursor.fetchall()
 
-        if(resp is not None and resp[0] == artistID):
+        if(resp is not None and ((artistID,) in resp)):
             print(dir + " exists in image_type_details. Updating.")
-            add_image=("UPDATE image_type_details SET artist_id=%s, description=%s WHERE type=%s")
-            data_image = (artistID, data[dir.replace(" ", "_").lower()], dir)
+            add_image=("UPDATE image_type_details SET description=%s WHERE type=%s AND artist_id=%s")
+            data_image = (data[dir.replace(" ", "_").lower()], dir, artistID)
             cursor.execute(add_image, data_image)
             print(cursor.rowcount, "record(s) affected") 
 
@@ -307,15 +255,16 @@ def add_one_JSON(cursor, data, connection):
             data_image = (artistID, data[dir.replace(" ", "_").lower()], dir)
             cursor.execute(add_image, data_image)
             emp_no = cursor.lastrowid
-            print(emp_no)
 
         #Run though number of images
         for i in range(1, imagenum + 1):
             tmpfile = tmppath2 + "/" + dir.replace(" ", "-") + "-in-the-style-of-" + data['fullname'].replace(" ", "-") + "-" + str(i) + ".png"
             filename = os.path.basename(tmpfile)
+            imageID = -1
 
             #if image exists locally, upload/update it on WP
             if os.path.exists(tmpfile):
+                print("upload/update " + tmpfile)
                 image = open(tmpfile, "rb").read()
                 credentials = USER + ':' + PASS
                 token = base64.b64encode(credentials.encode())
@@ -374,81 +323,79 @@ def add_one_JSON(cursor, data, connection):
                     link = newDict.get('guid').get("rendered")
                     print ("ADDED new image at at " + link)
 
-            #Image uploaded/updated - add it to image index
-            #Check for duplicate
-            check_dupe=("SELECT artist_id from image_index WHERE image_id=%s")
-            dupe_data=(imageID,)
-            cursor.execute(check_dupe, dupe_data)    
-            resp = cursor.fetchone()
+                #Image uploaded/updated - add it to image index
+                if(imageID == -1):
+                    raise ValueError("imageID was not set")
+                
+                table_name = "image_index"
+                dupe_ID = "image_id"
+                dupe_val = imageID
+                column_IDs = ['artist_id', 'type']
+                column_vals = [artistID, dir]
+                mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
+            
 
-            if(resp is not None and resp[0] == artistID):
-                print(filename + " exists in image_index. Updating.")
-                add_image=("UPDATE image_index SET artist_id=%s, type=%s WHERE image_id=%s")
-                data_image = (artistID, dir, imageID)
-                cursor.execute(add_image, data_image)
-                print(cursor.rowcount, "record(s) affected") 
-
-            else:
-                print(filename + " does not exist in image_index. Adding.")
-                add_image=("INSERT INTO image_index"
-                    "(image_id, artist_id, type)"
-                    "VALUES (%s, %s, %s)")
-                data_image = (imageID, artistID, dir)
-                cursor.execute(add_image, data_image)
-                emp_no = cursor.lastrowid
-                print(emp_no)
-                           
-    connection.commit()
-
-def mySQL_add_or_update(filename, table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor):
+def mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor):
     #Take in table_name, artistID, dupe_ID, dupe_val, column_IDs[], column_vals[], cursor
     #Everything must come in as a string except artist ID
+    
     if (len(column_IDs) != len(column_vals)):
         raise ValueError("column ID and vals must have the same size")
     
-    #check_dupe=("SELECT artist_id from %s WHERE %s=%s")
-    #dupe_data=(table_name, dupe_ID, dupe_val)
-    #cursor.execute(check_dupe, dupe_data)    
+    # values use %s to add quotes, but IDs must be added directly to the string
+    check_dupe=("SELECT artist_id FROM " + table_name + " WHERE " + dupe_ID + "=%s")
+    dupe_data=(dupe_val,)
+    cursor.execute(check_dupe, dupe_data)    
     #resp = cursor.fetchone()
-    resp = [1]
+    resp = cursor.fetchall()
+    print(check_dupe % dupe_data)
+    print(resp)
+    print(artistID)
+    newID = -1
 
-    if(resp is not None and resp[0] == artistID):
+    #if we are running the insert artist, artist ID passed in will be -1 and cannot be used for checks
+    #new ID is only collected in this case
+    if(artistID == -1):
+        if(resp is not None):
+            artistID = resp[0][0]
+            print("overide artist ID")
+
+    newID = artistID
+
+    if(resp is not None and ((artistID,) in resp)):
         if(len(column_IDs) > 1):
-            print(filename + " exists in " + table_name + ". Updating.")
-            add = "UPDATE " + table_name + " SET "
+            print("artistID=" + str(artistID) + " and " + dupe_ID + "=" + str(dupe_val) + " exists in " + table_name + ". Updating.")
+            add_string = "UPDATE " + table_name + " SET "
+            add_data = ()
             for ID, val in zip(column_IDs, column_vals):
-                add = add + ID + "=" + val +", "
-            add = add[:-2] + " WHERE " + dupe_ID + "=" + dupe_val
-            print(add)
-            #add_image=("UPDATE %s SET artist_id=%s, type=%s WHERE %s=%s") #figure out how to make this variable
-            #data_image = (artistID, dir, imageID)
-            #cursor.execute(add)
-            #print(cursor.rowcount, "record(s) affected") 
+                add_string = add_string + ID + "=%s, "
+                add_data = add_data + (val,)
+            add_string = add_string[:-2] + " WHERE " + dupe_ID + "=%s"
+            add_data = add_data + (dupe_val,)
+            print(add_string % add_data)
+            cursor.execute(add_string, add_data)
+            print(cursor.rowcount, "record(s) affected")
         else:
-            print(filename + " exists in " + table_name + ". Doing nothing.")
+            print("artistID=" + str(artistID) + " and " + dupe_ID + "=" + str(dupe_val) + " exists in " + table_name + ". Doing nothing.")
 
     else:
-        print(filename + " does not exist in image_index. Adding.")
+        print("artistID=" + str(artistID) + " and " + dupe_ID + "=" + str(dupe_val) + " does not exist in " + table_name + ". Adding.")
 
-        add = "INSERT INTO " + table_name + " "
+        add_string = "INSERT INTO " + table_name + " ("
+        add_data = ()
+        vals = "VALUES ("
         for ID, val in zip(column_IDs, column_vals):
-            add = add + ID + "=" + val + ", "
-        add = add + dupe_ID + "=" + dupe_val
-        print(add)
+            add_string = add_string + ID + ", "
+            add_data = add_data + (val,)
+            vals = vals + "%s, "
 
-        #cursor.execute(add_image, data_image)
-        #emp_no = cursor.lastrowid
-        #print(emp_no)
+        add_string = add_string + dupe_ID + ") " + vals + "%s )"
+        add_data = add_data + (dupe_val,)
+        print(add_string % add_data)
+        cursor.execute(add_string, add_data)
+        newID = cursor.lastrowid
+    return newID
     
 
 if __name__ == '__main__':
-    #main()
-    filename = "test"
-    table_name = "artist_index"
-    artistID = 1
-    dupe_ID = "name"
-    dupe_val = "steve"
-    column_IDs = ["birth", "death"]
-    column_vals = ["1980", "2000"]
-    cursor = "no"
-    mySQL_add_or_update(filename, table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
+    main()
