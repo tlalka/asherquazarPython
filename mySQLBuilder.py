@@ -210,7 +210,6 @@ def add_one_JSON(cursor, data, connection):
                 column_vals = [artistID]
                 mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
 
-    return 1
     #decades
     for decade in data['decades']:
         table_name = "decades"
