@@ -166,11 +166,8 @@ def loop_JSON(cursor, connection):
         with open(single_file, 'r') as f:
             data = json.load(f)
             print("JSON handle: " + data['fullname'])
-            add_one_JSON(cursor, data, connection)
+            add_one_JSON(cursor, data, connection) 
 
-            #add works if they exist
-
-            #add profile if it exists
         connection.commit()
 
         
@@ -189,6 +186,31 @@ def add_one_JSON(cursor, data, connection):
     column_vals = [str(data['birthyear']), str(data['deathyear']), data['style'], data['biography'], data['wikilink'], data['nationality']]
     artistID = mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
 
+    #add profile and works images if they exist
+    imagespath = imgsrc + data['fullname'].replace(" ", "_") + "/works"
+    for image in os.listdir(imagespath):
+        if (image.endswith(".png") or image.endswith(".jpg")):
+            if(image.startswith("profile")):
+                #upload profile. There should be only one per
+                imageID = WPImage_add_or_update(data['fullname'] + "_" + image, imagespath + "/" + image)
+                table_name = "profile_index"
+                dupe_ID = "artist_id"
+                dupe_val = artistID
+                column_IDs = ["image_id"]
+                column_vals = [imageID]
+                mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
+
+            else:
+                #upload works. Image IDs should only appear once
+                imageID = WPImage_add_or_update(data['fullname'] + "_" + image, imagespath + "/" + image)
+                table_name = "works_index"
+                dupe_ID = "image_id"
+                dupe_val = imageID
+                column_IDs = ["artist_id"]
+                column_vals = [artistID]
+                mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, column_vals, cursor)
+
+    return 1
     #decades
     for decade in data['decades']:
         table_name = "decades"
@@ -260,68 +282,11 @@ def add_one_JSON(cursor, data, connection):
         for i in range(1, imagenum + 1):
             tmpfile = tmppath2 + "/" + dir.replace(" ", "-") + "-in-the-style-of-" + data['fullname'].replace(" ", "-") + "-" + str(i) + ".png"
             filename = os.path.basename(tmpfile)
-            imageID = -1
 
             #if image exists locally, upload/update it on WP
             if os.path.exists(tmpfile):
-                print("upload/update " + tmpfile)
-                image = open(tmpfile, "rb").read()
-                credentials = USER + ':' + PASS
-                token = base64.b64encode(credentials.encode())
 
-                #test if image exists on WP by checking the name
-                param = {
-                    'search': filename
-                    }
-                
-                resp = requests.get(
-                    MEDIA,
-                    params = param
-                )
-
-                #print(resp)
-                newDict = resp.json()
-                #print(newDict)
-
-                if len(newDict) > 0:
-                    imageID = newDict[0]['id']
-                    print(filename + " exists at ID " + str(imageID))
-                    #Image exists on WP, so update it
-                    header = {
-                        'Authorization': 'Basic ' + token.decode('utf-8')
-                    }
-
-                    resp = requests.post(
-                        MEDIA + "/" + str(imageID),
-                        headers = header,
-                        data = image,
-                    )
-                    
-                    #print(resp)
-                    newDict = resp.json()
-                    #print (newDict)
-                    link = newDict.get('guid').get("rendered")
-                    print ("UPDATED at " + link)
-
-                else:
-                    #image does not exist on WP, so upload it
-                    print(filename + " does not exist")
-                    header = {
-                        'Authorization': 'Basic ' + token.decode('utf-8'),
-                        "Content-Type": 'image/png',
-                        'Content-Disposition': 'attachment; filename=' + filename,
-                    }
-
-                    resp = requests.post(
-                        MEDIA,
-                        headers = header,
-                        data = image,
-                    )
-                    
-                    newDict = resp.json()
-                    imageID = newDict.get('id')
-                    link = newDict.get('guid').get("rendered")
-                    print ("ADDED new image at at " + link)
+                imageID = WPImage_add_or_update(filename, tmpfile)
 
                 #Image uploaded/updated - add it to image index
                 if(imageID == -1):
@@ -349,8 +314,6 @@ def mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, col
     #resp = cursor.fetchone()
     resp = cursor.fetchall()
     print(check_dupe % dupe_data)
-    print(resp)
-    print(artistID)
     newID = -1
 
     #if we are running the insert artist, artist ID passed in will be -1 and cannot be used for checks
@@ -395,7 +358,70 @@ def mySQL_add_or_update(table_name, artistID, dupe_ID, dupe_val, column_IDs, col
         cursor.execute(add_string, add_data)
         newID = cursor.lastrowid
     return newID
+
     
+def WPImage_add_or_update(wpfilename, localfile):
+    print("upload/update " + localfile)
+    image = open(localfile, "rb").read()
+    credentials = USER + ':' + PASS
+    token = base64.b64encode(credentials.encode())
+    imageID = -1
+
+    #test if image exists on WP by checking the name
+    param = {
+        'search': wpfilename
+        }
+    
+    resp = requests.get(
+        MEDIA,
+        params = param
+    )
+
+    #print(resp)
+    newDict = resp.json()
+    #print(newDict)
+
+    if len(newDict) > 0:
+        imageID = newDict[0]['id']
+        print(wpfilename + " exists at ID " + str(imageID))
+        #Image exists on WP, so update it
+        header = {
+            'Authorization': 'Basic ' + token.decode('utf-8')
+        }
+
+        resp = requests.post(
+            MEDIA + "/" + str(imageID),
+            headers = header,
+            data = image,
+        )
+        
+        #print(resp)
+        newDict = resp.json()
+        #print (newDict)
+        link = newDict.get('guid').get("rendered")
+        print ("UPDATED at " + link)
+
+    else:
+        #image does not exist on WP, so upload it
+        print(wpfilename + " does not exist")
+        header = {
+            'Authorization': 'Basic ' + token.decode('utf-8'),
+            "Content-Type": 'image/png',
+            'Content-Disposition': 'attachment; filename=' + wpfilename,
+        }
+
+        resp = requests.post(
+            MEDIA,
+            headers = header,
+            data = image,
+        )
+        
+        newDict = resp.json()
+        imageID = newDict.get('id')
+        link = newDict.get('guid').get("rendered")
+        print ("ADDED new image at at " + link)
+    return imageID
+
 
 if __name__ == '__main__':
     main()
